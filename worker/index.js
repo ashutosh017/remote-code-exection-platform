@@ -10,7 +10,7 @@ if (!fs.existsSync(CODE_DIR)) {
   fs.mkdirSync(CODE_DIR, { recursive: true });
 }
 
-function runUserCodeInContainer(code, language, problemId) {
+async function runUserCodeInContainer(code, language, problemId) {
   const fileExtension =
     language === "python"
       ? "py"
@@ -32,19 +32,25 @@ function runUserCodeInContainer(code, language, problemId) {
 
   console.log("Executing:", dockerCommand);
 
-  exec(dockerCommand, (error, stdout, stderr) => {
-    if (error) {
-      console.error(`Execution error: ${error.message}`);
-      return;
-    }
-    if (stderr) {
-      console.error(`stderr: ${stderr}`);
-      return;
-    }
-    console.log(`Output:\n${stdout}`);
+  const res = await runDockerCommand(dockerCommand)
+  return res;
+}
+function runDockerCommand(dockerCommand) {
+  return new Promise((resolve, reject) => {
+    exec(dockerCommand, (error, stdout, stderr) => {
+      if (error) {
+        console.error(`Execution error: ${error.message}`);
+        return reject(error.message);
+      }
+      if (stderr) {
+        console.error(`stderr: ${stderr}`);
+        return reject(stderr);
+      }
+      console.log(`Output:\n${stdout}`);
+      resolve(stdout);
+    });
   });
 }
-
 function getExecutionCommand(language, problemId) {
   switch (language) {
     case "python":
@@ -61,7 +67,8 @@ function getExecutionCommand(language, problemId) {
 async function processSubmission(submission) {
   const { problemId, code, language } = JSON.parse(submission);
   console.log("Processing submission for problem ID:", problemId);
-  runUserCodeInContainer(code, language, problemId);
+  const res = runUserCodeInContainer(code, language, problemId);
+  return res;
 }
 
 async function startServer() {
@@ -71,7 +78,10 @@ async function startServer() {
     while (true) {
       try {
         const submission = await client.brPop("problems", 0);
-        await processSubmission(submission.element);
+        const res = await processSubmission(submission.element);
+        console.log("res: ",res)
+        
+       client.publish("submission",JSON.stringify(res))
       } catch (error) {
         console.log("Error processing submission:", error);
       }

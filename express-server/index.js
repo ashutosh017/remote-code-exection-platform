@@ -5,6 +5,7 @@ const client = createClient()
 const app = express();
 app.use(cors())
 app.use(express.json());
+const port = 3001
 
 client.on("error",(err)=>{
     console.log("redis client error: ",err)
@@ -29,8 +30,8 @@ async function startServer(){
     await client.connect();try {
         
         console.log("connected to redis client")
-        app.listen(3000,()=>{
-            console.log("app is listening on port 3000")
+        app.listen(port,()=>{
+            console.log("app is listening on port 3001")
         })
     } catch (error) {
         console.log("error connecting redis client: ",error)
