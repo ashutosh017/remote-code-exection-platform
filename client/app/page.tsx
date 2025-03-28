@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Editor from "@monaco-editor/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,27 +27,39 @@ type MessageType = {
 };
 let socket: WebSocket;
 export default function CodeEditorPage() {
+  const socketRef = useRef<WebSocket | null>(null);
+  
   useEffect(() => {
-    socket = new WebSocket("ws://localhost:8080");
-    socket.addEventListener("message", (msg: any) => {
-      console.log("msg recieved: ", msg.data);
-      const parsedMessage = JSON.parse(msg.data);
-      if (parsedMessage.event === "SUBMISSION_SUCCESS") {
-        console.log("submission success: ", parsedMessage.data.data);
-        setOutput((prev) => [
-          ...prev,
-          {
-            timestamp: formatTimestamp(),
-            content: parsedMessage.data.data,
-            status: "success",
-          },
-        ]);
+    const socket = new WebSocket("ws://localhost:8080");
+    socketRef.current = socket;
+
+    socket.addEventListener("message", (msg) => {
+      console.log("msg received: ", msg.data);
+      try {
+        const parsedMessage = JSON.parse(msg.data);
+        if (parsedMessage.event === "SUBMISSION_SUCCESS") {
+          console.log("submission success: ", parsedMessage.data.data);
+          setOutput((prev) => [
+            ...prev,
+            {
+              timestamp: new Date().toLocaleTimeString(), 
+              content: parsedMessage.data.data,
+              status: "success",
+            },
+          ]);
+        }
+      } catch (error) {
+        console.error("Error parsing WebSocket message:", error);
       }
     });
-    return () => socket.close();
-  });
 
-  const [code, setCode] = useState<string>("");
+    return () => {
+      socket.close();
+      socketRef.current = null;
+    };
+  }, []); 
+
+  const [code, setCode] = useState<string>("// Write your JavaScript code here\nconsole.log(\'Hello, world!\');");
   const [language, setLanguage] = useState<Language>("javascript");
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [output, setOutput] = useState<OutputEntry[]>([]);

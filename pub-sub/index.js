@@ -1,52 +1,66 @@
 import { createClient } from "redis";
 
+// Create Redis client
 const subscriber = createClient();
-subscriber.on("error",(err)=>{
-    console.log("redis client error: ",err)
-})
 
-// Creates a new WebSocket connection to the specified URL.
+subscriber.on("error", (err) => {
+    console.error("Redis client error:", err);
+});
+
+// Create WebSocket connection
 const socket = new WebSocket('ws://localhost:8080');
 
-// Executes when the connection is successfully established.
-socket.addEventListener('open',(event)=>{
-    console.log("websocket connection established!")
-    socket.send(JSON.stringify({
-        msg:"subscriber connected "
-    }))
-})
-
-// Listen for messages and executes when a message is received from the server.
-socket.addEventListener('message', event => {
-  console.log('Message from server: ', event.data);
+// Handle WebSocket events
+socket.addEventListener('open', () => {
+    console.log("WebSocket connection established!");
+    socket.send(JSON.stringify({ msg: "subscriber connected" }));
 });
 
-// Executes when the connection is closed, providing the close code and reason.
-socket.addEventListener('close', event => {
-  console.log('WebSocket connection closed:', event.code, event.reason);
+socket.addEventListener('message', (event) => {
+    console.log('Message from server:', event.data);
 });
 
-// Executes if an error occurs during the WebSocket communication.
-socket.addEventListener('error', error => {
-  console.error('WebSocket error:', error);
+socket.addEventListener('close', (event) => {
+    console.log('WebSocket connection closed:', event.code, event.reason);
 });
 
+socket.addEventListener('error', (error) => {
+    console.error('WebSocket error:', error);
+});
 
-async function main(){
-   try {
-     await subscriber.connect();
-     console.log("subscriber connected successfully!")
-     await subscriber.subscribe("submission",(msg)=>{
-         console.log("msg recieved: ",msg)
-         socket.send(JSON.stringify({
-            event:"SUBMISSION",
-            data:msg
-         }))
-     })
-   } catch (error) {
-    console.log("error connecting subscriber: ",error)
-   }
+// ✅ THIS is the correct usage in Redis v4+
+async function main() {
+    try {
+        await subscriber.connect();
+        console.log("Subscriber connected successfully!");
 
+        // You need to use subscriber.subscribe(channel, listener)
+        await subscriber.subscribe("submission", (message) => {
+            console.log("Message received from Redis:", message);
+
+            // Check if WebSocket is ready before sending
+            if (socket.readyState === WebSocket.OPEN) {
+                socket.send(JSON.stringify({
+                    event: "SUBMISSION",
+                    data: message
+                }));
+            } else {
+                console.warn("WebSocket not open. Message not sent.");
+            }
+        });
+
+    } catch (error) {
+        console.error("Error connecting subscriber:", error);
+    }
 }
 
+// Graceful shutdown (optional)
+process.on('SIGINT', async () => {
+    console.log("Shutting down...");
+    await subscriber.quit();
+    socket.close();
+    process.exit(0);
+});
+
+// Start it
 main();

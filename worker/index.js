@@ -24,7 +24,7 @@ async function runUserCodeInContainer(code, language, problemId) {
   fs.writeFileSync(filePath, code);
 
   const dockerCommand = `
-  sudo docker run --rm \
+   docker run --rm \
   -v ${CODE_DIR}:/code \
   ${language === "python" ? "python:3.10" : language==="cpp"?"gcc:latest" :"node"} \
   bash -c "cd /code && ${getExecutionCommand(language, problemId)}"
@@ -81,7 +81,7 @@ async function startServer() {
         const res = await processSubmission(submission.element);
         console.log("res: ",res)
         
-       client.publish("submission",JSON.stringify(res))
+       client.publish("submission",res)
       } catch (error) {
         console.log("Error processing submission:", error);
       }
